@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRL Toolkit — Sign in</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --border: #2a2f3a;
+    --text: #e6e8ec; --muted: #8b93a3; --red: #e74c3c; --accent: #6c8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px; width: 100%; max-width: 360px;
+  }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  input {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    font-size: 15px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  button {
+    width: 100%; margin-top: 22px; background: var(--accent); color: #fff;
+    border: 0; border-radius: 8px; padding: 11px; font-weight: 600;
+    font-size: 15px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; }
+  #error { color: var(--red); font-size: 13px; margin-top: 12px;
+           min-height: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<form class="card" id="form">
+  <h1>IRL Toolkit</h1>
+  <p class="sub">Remote OBS &amp; stream control</p>
+  <label for="user">Username</label>
+  <input id="user" autocomplete="username" required autofocus>
+  <label for="pass">Password</label>
+  <input id="pass" type="password" autocomplete="current-password" required>
+  <button id="btn">Sign in</button>
+  <div id="error"></div>
+</form>
+<script>
+const form = document.getElementById('form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn'), err = document.getElementById('error');
+  btn.disabled = true; err.textContent = '';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('user').value,
+        password: document.getElementById('pass').value,
+      }),
+    });
+    if (r.ok) { location.href = '/'; return; }
+    err.textContent = (await r.json()).detail || 'Sign-in failed';
+  } catch { err.textContent = 'Network error'; }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>

@@ -7,13 +7,16 @@ in the repo or the image.
 
 import json
 import os
+import secrets
 import shutil
+import time
 from pathlib import Path
 
+import bcrypt
 import requests
 import obsws_python as obsws
-from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Cookie, FastAPI, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -33,7 +36,64 @@ SCENE_BRB = "BRB"
 SOURCE_BRB_MEDIA = "BRB Media"
 SOURCE_BRB_IMAGE = "BRB Image"
 
+DASH_USER = os.environ.get("DASH_USER", "admin")
+DASH_PASS_HASH = os.environ.get("DASH_PASS_HASH", "")
+
+SESSION_TTL = 7 * 86400
+_sessions: dict[str, float] = {}  # token -> expiry (in-memory; re-login on restart)
+
 app = FastAPI(title="IRL-Toolkit dashboard")
+
+
+def session_valid(token):
+    exp = _sessions.get(token)
+    if not exp or exp < time.time():
+        _sessions.pop(token, None)
+        return False
+    return True
+
+
+class Login(BaseModel):
+    username: str
+    password: str
+
+
+@app.get("/login")
+def login_page():
+    return FileResponse("static/login.html")
+
+
+@app.post("/api/login")
+def login(body: Login, response: Response):
+    ok = secrets.compare_digest(body.username, DASH_USER) and bcrypt.checkpw(
+        body.password.encode(), DASH_PASS_HASH.encode()
+    )
+    if not ok:
+        time.sleep(0.5)  # blunt brute-force damper
+        raise HTTPException(status_code=401, detail="wrong username or password")
+    token = secrets.token_urlsafe(32)
+    _sessions[token] = time.time() + SESSION_TTL
+    response.set_cookie(
+        "session", token, max_age=SESSION_TTL,
+        httponly=True, secure=True, samesite="lax",
+    )
+    return {"ok": True}
+
+
+@app.post("/api/logout")
+def logout(response: Response, session: str | None = Cookie(default=None)):
+    if session:
+        _sessions.pop(session, None)
+    response.delete_cookie("session")
+    return {"ok": True}
+
+
+@app.get("/auth/verify")
+def auth_verify(session: str | None = Cookie(default=None)):
+    """Caddy forward_auth hits this for every protected request."""
+    if session and session_valid(session):
+        return Response(status_code=204)
+    return RedirectResponse("/login", status_code=302)
 
 
 def load_config():

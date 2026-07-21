@@ -65,6 +65,8 @@ services:
       OBS_PORT: "4455"
       OBS_WS_PASSWORD: ${OBS_WS_PASSWORD}
       WATCHDOG_URL: http://watchdog:8081
+      DASH_USER: ${DASH_USER}
+      DASH_PASS_HASH: ${DASH_PASS_HASH}
     volumes:
       - ./data/media:/media
       - ./data/config:/data
@@ -77,8 +79,6 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:-}
-      DASH_USER: ${DASH_USER}
-      DASH_PASS_HASH: ${DASH_PASS_HASH}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

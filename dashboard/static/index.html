@@ -90,8 +90,11 @@
 
   <div class="card">
     <h2>Advanced</h2>
-    <a href="/obs/vnc.html?path=obs/websockify&autoconnect=true" target="_blank">
-      Open remote OBS (noVNC)</a>
+    <div class="row">
+      <a href="/obs/vnc.html?path=obs/websockify&autoconnect=true" target="_blank">
+        Open remote OBS (noVNC)</a>
+      <a href="#" id="logout">Sign out</a>
+    </div>
   </div>
 </main>
 <div id="toast"></div>
@@ -164,6 +167,11 @@ $('upload').onclick = () => {
   post('/api/brb', fd, true)
     .then(r => { toast('BRB updated: ' + r.file); refresh(); })
     .catch(e => toast(e.message));
+};
+
+$('logout').onclick = (e) => {
+  e.preventDefault();
+  post('/api/logout').finally(() => location.href = '/login');
 };
 
 refresh();

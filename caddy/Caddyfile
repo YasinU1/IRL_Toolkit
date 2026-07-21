@@ -1,29 +1,36 @@
-# TLS + basic auth in front of the dashboard and noVNC.
+# TLS in front of the dashboard and noVNC. Authentication is a session
+# cookie issued by the dashboard's own login page; Caddy asks the dashboard
+# to validate it (forward_auth) on every protected request, so the remote
+# OBS (noVNC) is covered by the same login.
 #
 # By default this serves on :443 with Caddy's internal CA (self-signed —
-# your browser will warn once, traffic is still encrypted). If you set
-# DOMAIN in .env and point DNS at the server, replace the first line with
-# your domain and Caddy will fetch real Let's Encrypt certificates:
-#
-#   stream.example.com {
-#       ...same body...
-#   }
+# your browser warns once, traffic is still encrypted). For real certs,
+# set up DNS and replace ":443" with your domain, then delete the
+# "tls internal" block.
 
 :443 {
 	tls internal {
 		on_demand
 	}
 
-	basic_auth {
-		{$DASH_USER} {$DASH_PASS_HASH}
+	# Public: the login page and the login endpoint themselves.
+	@public path /login /api/login
+	handle @public {
+		reverse_proxy dashboard:8000
 	}
 
 	# Remote OBS via noVNC:  /obs/vnc.html?path=obs/websockify&autoconnect=true
 	handle_path /obs/* {
+		forward_auth dashboard:8000 {
+			uri /auth/verify
+		}
 		reverse_proxy obs:6080
 	}
 
 	handle {
+		forward_auth dashboard:8000 {
+			uri /auth/verify
+		}
 		reverse_proxy dashboard:8000
 	}
 }
