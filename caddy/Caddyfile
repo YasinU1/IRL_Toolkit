@@ -10,7 +10,9 @@
 #   }
 
 :443 {
-	tls internal
+	tls internal {
+		on_demand
+	}
 
 	basic_auth {
 		{$DASH_USER} {$DASH_PASS_HASH}

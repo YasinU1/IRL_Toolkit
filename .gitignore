@@ -3,3 +3,6 @@ data/
 __pycache__/
 *.pyc
 .DS_Store
+*.key
+*.key.pub
+ssh-key-*
