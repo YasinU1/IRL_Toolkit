@@ -12,8 +12,13 @@ apiAddress: :9997
 # Protocol servers
 rtsp: no
 webrtc: no
-hls: no
 playback: no
+
+# Low-latency HLS used by the dashboard's ingest preview (proxied by caddy
+# at /preview/, protected by the dashboard login — not exposed publicly).
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
 
 rtmp: yes
 rtmpAddress: :1935

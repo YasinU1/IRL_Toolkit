@@ -14,10 +14,34 @@
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
-    display: flex; justify-content: center; padding: 24px 12px;
   }
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(24,27,34,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border); padding: 12px 18px;
+  }
+  nav .brand { font-weight: 700; font-size: 16px; }
+  nav .links { display: flex; gap: 8px; }
+  nav .links a {
+    text-decoration: none; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    color: var(--text); background: var(--card);
+  }
+  nav .links a.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .wrap { display: flex; justify-content: center; padding: 20px 12px; }
   main { width: 100%; max-width: 560px; }
-  h1 { font-size: 20px; margin: 0 0 16px; }
+  #previewbox {
+    position: relative; background: #000; border-radius: 8px;
+    overflow: hidden; aspect-ratio: 16 / 9;
+  }
+  #preview { width: 100%; height: 100%; display: block; }
+  #nosignal {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--muted); font-size: 14px;
+    background: repeating-linear-gradient(45deg, #0a0c10, #0a0c10 12px,
+                #0e1015 12px, #0e1015 24px);
+  }
   .card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: 12px; padding: 16px; margin-bottom: 14px;
@@ -48,8 +72,23 @@
 </style>
 </head>
 <body>
+<nav>
+  <span class="brand">IRL Toolkit</span>
+  <span class="links">
+    <a class="primary" href="/obs/vnc.html?path=obs/websockify&autoconnect=true"
+       target="_blank">Remote OBS</a>
+    <a href="#" id="logout">Sign out</a>
+  </span>
+</nav>
+<div class="wrap">
 <main>
-  <h1>IRL Toolkit — Control</h1>
+  <div class="card">
+    <h2>Ingest preview</h2>
+    <div id="previewbox">
+      <video id="preview" muted playsinline autoplay></video>
+      <div id="nosignal">No signal — waiting for your phone…</div>
+    </div>
+  </div>
 
   <div class="card">
     <h2>Status</h2>
@@ -88,17 +127,11 @@
     <div class="muted" id="brbstate"></div>
   </div>
 
-  <div class="card">
-    <h2>Advanced</h2>
-    <div class="row">
-      <a href="/obs/vnc.html?path=obs/websockify&autoconnect=true" target="_blank">
-        Open remote OBS (noVNC)</a>
-      <a href="#" id="logout">Sign out</a>
-    </div>
-  </div>
 </main>
+</div>
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <script>
 const $ = id => document.getElementById(id);
 
@@ -111,10 +144,38 @@ function setPill(el, text, cls) {
   el.textContent = text; el.className = 'pill ' + cls;
 }
 
+// ---- Ingest preview (LL-HLS from MediaMTX via /preview/) ----
+const PREVIEW_URL = '/preview/live/index.m3u8';
+const video = $('preview');
+let hls = null, previewOn = false;
+
+function startPreview() {
+  if (previewOn) return;
+  previewOn = true;
+  $('nosignal').style.display = 'none';
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = PREVIEW_URL;          // Safari/iOS: native HLS
+    video.play().catch(() => {});
+  } else if (window.Hls && Hls.isSupported()) {
+    hls = new Hls({ lowLatencyMode: true });
+    hls.loadSource(PREVIEW_URL);
+    hls.attachMedia(video);
+  }
+}
+
+function stopPreview() {
+  if (!previewOn) return;
+  previewOn = false;
+  $('nosignal').style.display = 'flex';
+  if (hls) { hls.destroy(); hls = null; }
+  video.removeAttribute('src'); video.load();
+}
+
 async function refresh() {
   try {
     const s = await (await fetch('/api/status')).json();
     const w = s.watchdog, o = s.obs, c = s.config;
+    if (w) w.ingest_healthy ? startPreview() : stopPreview();
     if (w) {
       setPill($('scene'), w.scene.toUpperCase(),
               w.scene === 'LIVE' ? 'live' : w.scene === 'BRB' ? 'brb' : 'off');

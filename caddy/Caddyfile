@@ -27,6 +27,14 @@
 		reverse_proxy obs:6080
 	}
 
+	# Ingest preview (MediaMTX low-latency HLS)
+	handle_path /preview/* {
+		forward_auth dashboard:8000 {
+			uri /auth/verify
+		}
+		reverse_proxy mediamtx:8888
+	}
+
 	handle {
 		forward_auth dashboard:8000 {
 			uri /auth/verify
