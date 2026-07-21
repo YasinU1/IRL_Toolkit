@@ -222,6 +222,17 @@ def run():
         now = time.monotonic()
 
         try:
+            # Respect manual control: re-read the actual program scene each
+            # tick; if the user switched to some other scene (second ingest,
+            # starting-soon, ...) from the dashboard or OBS, stand down until
+            # they come back to LIVE or BRB.
+            scene = cl.get_current_program_scene().current_program_scene_name
+            set_state(scene=scene)
+            if scene not in (SCENE_LIVE, SCENE_BRB):
+                down_since = None
+                up_since = None
+                continue
+
             if scene == SCENE_LIVE:
                 up_since = None
                 if healthy:

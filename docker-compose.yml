@@ -65,6 +65,7 @@ services:
       OBS_PORT: "4455"
       OBS_WS_PASSWORD: ${OBS_WS_PASSWORD}
       WATCHDOG_URL: http://watchdog:8081
+      MEDIAMTX_API: http://mediamtx:9997
       DASH_USER: ${DASH_USER}
       DASH_PASS_HASH: ${DASH_PASS_HASH}
     volumes:
