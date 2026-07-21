@@ -1,0 +1,31 @@
+# TLS + basic auth in front of the dashboard and noVNC.
+#
+# By default this serves on :443 with Caddy's internal CA (self-signed —
+# your browser will warn once, traffic is still encrypted). If you set
+# DOMAIN in .env and point DNS at the server, replace the first line with
+# your domain and Caddy will fetch real Let's Encrypt certificates:
+#
+#   stream.example.com {
+#       ...same body...
+#   }
+
+:443 {
+	tls internal
+
+	basic_auth {
+		{$DASH_USER} {$DASH_PASS_HASH}
+	}
+
+	# Remote OBS via noVNC:  /obs/vnc.html?path=obs/websockify&autoconnect=true
+	handle_path /obs/* {
+		reverse_proxy obs:6080
+	}
+
+	handle {
+		reverse_proxy dashboard:8000
+	}
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}

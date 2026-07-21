@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRL Toolkit — Control</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --border: #2a2f3a;
+    --text: #e6e8ec; --muted: #8b93a3;
+    --green: #2ecc71; --red: #e74c3c; --amber: #f1c40f; --accent: #6c8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 24px 12px;
+  }
+  main { width: 100%; max-width: 560px; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--muted); margin: 0 0 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between;
+         gap: 10px; margin-bottom: 8px; }
+  .pill { padding: 3px 12px; border-radius: 99px; font-weight: 600; font-size: 13px; }
+  .pill.live { background: rgba(46,204,113,.15); color: var(--green); }
+  .pill.brb  { background: rgba(241,196,15,.15); color: var(--amber); }
+  .pill.off  { background: rgba(231,76,60,.15);  color: var(--red); }
+  .muted { color: var(--muted); font-size: 13px; }
+  input[type=password], input[type=text] {
+    flex: 1; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 16px; font-weight: 600; cursor: pointer;
+  }
+  button.danger { background: var(--red); }
+  button:disabled { opacity: .5; cursor: default; }
+  a { color: var(--accent); }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+           background: var(--card); border: 1px solid var(--border);
+           padding: 10px 18px; border-radius: 10px; display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>IRL Toolkit — Control</h1>
+
+  <div class="card">
+    <h2>Status</h2>
+    <div class="row"><span>Output scene</span><span id="scene" class="pill off">…</span></div>
+    <div class="row"><span>Phone ingest</span><span id="ingest" class="pill off">…</span></div>
+    <div class="row"><span>Ingest bitrate</span><span id="bitrate" class="muted">—</span></div>
+    <div class="row"><span>Twitch stream</span><span id="streaming" class="pill off">…</span></div>
+    <div class="row"><span>Dropped frames</span><span id="dropped" class="muted">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Stream</h2>
+    <div class="row">
+      <button id="start">Start stream</button>
+      <button id="stop" class="danger">Stop stream</button>
+    </div>
+    <div class="muted">Output keeps running through drops — the watchdog swaps
+      LIVE ⇄ BRB automatically.</div>
+  </div>
+
+  <div class="card">
+    <h2>Twitch stream key</h2>
+    <div class="row">
+      <input id="key" type="password" placeholder="paste stream key">
+      <button id="savekey">Save</button>
+    </div>
+    <div class="muted" id="keystate"></div>
+  </div>
+
+  <div class="card">
+    <h2>BRB screen</h2>
+    <div class="row">
+      <input id="brbfile" type="file" accept="video/*,image/*">
+      <button id="upload">Upload</button>
+    </div>
+    <div class="muted" id="brbstate"></div>
+  </div>
+
+  <div class="card">
+    <h2>Advanced</h2>
+    <a href="/obs/vnc.html?path=obs/websockify&autoconnect=true" target="_blank">
+      Open remote OBS (noVNC)</a>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+function setPill(el, text, cls) {
+  el.textContent = text; el.className = 'pill ' + cls;
+}
+
+async function refresh() {
+  try {
+    const s = await (await fetch('/api/status')).json();
+    const w = s.watchdog, o = s.obs, c = s.config;
+    if (w) {
+      setPill($('scene'), w.scene.toUpperCase(),
+              w.scene === 'LIVE' ? 'live' : w.scene === 'BRB' ? 'brb' : 'off');
+      setPill($('ingest'), w.ingest_healthy ? 'CONNECTED' : 'DOWN',
+              w.ingest_healthy ? 'live' : 'off');
+      $('bitrate').textContent = w.ingest_bitrate_kbps
+        ? (w.ingest_bitrate_kbps / 1000).toFixed(1) + ' Mbps' : '—';
+    }
+    if (o) {
+      setPill($('streaming'), o.streaming ? 'LIVE ON TWITCH' : 'OFFLINE',
+              o.streaming ? 'live' : 'off');
+      $('dropped').textContent =
+        o.total_frames ? `${o.dropped_frames} / ${o.total_frames}` : '—';
+    } else {
+      setPill($('streaming'), 'OBS UNREACHABLE', 'off');
+    }
+    $('keystate').textContent = c.stream_key_set ? 'Key is set ✓' : 'No key set yet';
+    $('brbstate').textContent = c.brb_file ? `Current: ${c.brb_file}` : 'No BRB media yet';
+  } catch (e) { /* server briefly away; keep last state */ }
+}
+
+async function post(url, body, isForm) {
+  const opts = { method: 'POST' };
+  if (body) {
+    if (isForm) opts.body = body;
+    else { opts.body = JSON.stringify(body);
+           opts.headers = { 'Content-Type': 'application/json' }; }
+  }
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+  return r.json();
+}
+
+$('start').onclick = () =>
+  post('/api/stream/start').then(() => toast('Stream started'))
+    .catch(e => toast(e.message));
+$('stop').onclick = () => {
+  if (confirm('Stop the Twitch stream?'))
+    post('/api/stream/stop').then(() => toast('Stream stopped'))
+      .catch(e => toast(e.message));
+};
+$('savekey').onclick = () =>
+  post('/api/stream-key', { key: $('key').value })
+    .then(() => { $('key').value = ''; toast('Key saved'); refresh(); })
+    .catch(e => toast(e.message));
+$('upload').onclick = () => {
+  const f = $('brbfile').files[0];
+  if (!f) return toast('Pick a file first');
+  const fd = new FormData(); fd.append('file', f);
+  post('/api/brb', fd, true)
+    .then(r => { toast('BRB updated: ' + r.file); refresh(); })
+    .catch(e => toast(e.message));
+};
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

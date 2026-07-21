@@ -1,0 +1,97 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.11.3
+    restart: unless-stopped
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    environment:
+      # MediaMTX list overrides use indexed env vars. User 0: the phone,
+      # publishing with creds from .env. User 1: anonymous inside the compose
+      # network only (OBS reading the stream, watchdog hitting the API).
+      MTX_AUTHINTERNALUSERS_0_USER: ${PUBLISH_USER}
+      MTX_AUTHINTERNALUSERS_0_PASS: ${PUBLISH_PASS}
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_0_ACTION: publish
+      MTX_AUTHINTERNALUSERS_1_USER: any
+      MTX_AUTHINTERNALUSERS_1_IPS: 127.0.0.1,::1,172.16.0.0/12
+      MTX_AUTHINTERNALUSERS_1_PERMISSIONS_0_ACTION: read
+      MTX_AUTHINTERNALUSERS_1_PERMISSIONS_1_ACTION: api
+    ports:
+      - "8890:8890/udp"   # direct SRT ingest (fallback)
+      - "1935:1935"       # RTMP ingest (fallback)
+
+  srtla:
+    build: ./srtla
+    restart: unless-stopped
+    depends_on:
+      - mediamtx
+    command: ["/usr/local/bin/srtla_rec", "5000", "mediamtx", "8890"]
+    ports:
+      - "5000:5000/udp"   # SRTLA bonded ingest (primary)
+
+  obs:
+    build: ./obs
+    restart: unless-stopped
+    shm_size: 1g
+    environment:
+      OBS_WS_PASSWORD: ${OBS_WS_PASSWORD}
+    volumes:
+      - obs_config:/config
+      - ./data/media:/media
+    depends_on:
+      - mediamtx
+
+  watchdog:
+    build: ./watchdog
+    restart: unless-stopped
+    environment:
+      OBS_HOST: obs
+      OBS_PORT: "4455"
+      OBS_WS_PASSWORD: ${OBS_WS_PASSWORD}
+      MEDIAMTX_API: http://mediamtx:9997
+      INGEST_PATH: live
+      SRT_READ_URL: srt://mediamtx:8890?streamid=read:live&latency=2000000
+      DOWN_THRESHOLD_SEC: "1.5"
+      UP_THRESHOLD_SEC: "3.0"
+      MIN_LIVE_DWELL_SEC: "5.0"
+    depends_on:
+      - obs
+      - mediamtx
+
+  dashboard:
+    build: ./dashboard
+    restart: unless-stopped
+    environment:
+      OBS_HOST: obs
+      OBS_PORT: "4455"
+      OBS_WS_PASSWORD: ${OBS_WS_PASSWORD}
+      WATCHDOG_URL: http://watchdog:8081
+    volumes:
+      - ./data/media:/media
+      - ./data/config:/data
+    depends_on:
+      - obs
+      - watchdog
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      DASH_USER: ${DASH_USER}
+      DASH_PASS_HASH: ${DASH_PASS_HASH}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on:
+      - dashboard
+      - obs
+
+volumes:
+  obs_config:
+  caddy_data:
+  caddy_config:

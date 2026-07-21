@@ -1,0 +1,41 @@
+# MediaMTX — ingest normalization layer.
+# Auth users are injected via the MTX_AUTHINTERNALUSERS env var in docker-compose.yml
+# (publish requires PUBLISH_USER/PUBLISH_PASS from .env; reads/API are open only to
+# the internal compose network). The list below is a locked-down fallback in case the
+# env override is removed: localhost-only everything.
+
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+# Protocol servers
+rtsp: no
+webrtc: no
+hls: no
+playback: no
+
+rtmp: yes
+rtmpAddress: :1935
+
+srt: yes
+srtAddress: :8890
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: ["127.0.0.1", "::1"]
+    permissions:
+      - action: publish
+      - action: read
+      - action: api
+
+paths:
+  # Single ingest path. Everything (SRTLA-debonded SRT, direct SRT, RTMP)
+  # publishes here; OBS reads srt://mediamtx:8890?streamid=read:live
+  live:
+    source: publisher
+    # A reconnecting phone must not be rejected because its dead previous
+    # session still holds the path.
+    overridePublisher: yes
