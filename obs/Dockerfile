@@ -73,8 +73,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libva2 libva-drm2 libva-x11-2 libxcb-xinput0 \
         # headless display + remote access
         xvfb x11vnc novnc websockify pulseaudio \
-        fonts-dejavu-core ca-certificates gettext-base \
+        fonts-dejavu-core ca-certificates gettext-base curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Sunshine: Moonlight-protocol desktop streaming (high-quality remote OBS;
+# noVNC stays as the zero-dependency fallback).
+ARG SUNSHINE_VERSION=2026.516.143833
+RUN curl -fsSL -o /tmp/sunshine.deb \
+        https://github.com/LizardByte/Sunshine/releases/download/v${SUNSHINE_VERSION}/sunshine-ubuntu-24.04-arm64.deb \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/sunshine.deb \
+    && rm /tmp/sunshine.deb && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local /usr/local
 RUN ldconfig
@@ -88,7 +96,8 @@ ENV HOME=/config \
     QT_QPA_PLATFORM=xcb \
     LIBGL_ALWAYS_SOFTWARE=1
 
-# 4455 obs-websocket (internal), 6080 noVNC (proxied by caddy)
-EXPOSE 4455 6080
+# 4455 obs-websocket (internal), 6080 noVNC (proxied by caddy),
+# 47984-47990/48010 tcp + 47998-48000 udp Sunshine/Moonlight
+EXPOSE 4455 6080 47989 47990
 
 ENTRYPOINT ["/entrypoint.sh"]

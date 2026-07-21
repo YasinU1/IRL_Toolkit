@@ -37,6 +37,14 @@ services:
     volumes:
       - obs_config:/config
       - ./data/media:/media
+    devices:
+      - /dev/uinput   # Moonlight mouse/keyboard injection
+    ports:
+      # Sunshine (Moonlight remote desktop). Not proxied by caddy — pair
+      # once via https://<host>:47990, then connect with the Moonlight app.
+      - "47984-47990:47984-47990/tcp"
+      - "48010:48010/tcp"
+      - "47998-48000:47998-48000/udp"
     depends_on:
       - mediamtx
 

@@ -35,9 +35,22 @@ Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
 # Dummy audio server so OBS's mixer has somewhere to live.
 pulseaudio --daemonize=yes --exit-idle-time=-1 --disallow-exit || true
 
-# VNC on the virtual display, wrapped in noVNC for the browser.
+# VNC on the virtual display, wrapped in noVNC for the browser (fallback).
 x11vnc -display :99 -forever -shared -nopw -rfbport 5900 -quiet &
 websockify --web /usr/share/novnc 6080 localhost:5900 &
+
+# Sunshine: high-quality remote desktop via Moonlight clients. Software
+# x264 encode of the same virtual display. Web UI (pairing) on :47990,
+# credentials admin / $OBS_WS_PASSWORD unless SUNSHINE_PASSWORD is set.
+mkdir -p "$HOME/.config/sunshine"
+if [ ! -f "$HOME/.config/sunshine/sunshine.conf" ]; then
+    cat > "$HOME/.config/sunshine/sunshine.conf" <<EOF
+capture = x11
+encoder = software
+EOF
+fi
+sunshine --creds admin "${SUNSHINE_PASSWORD:-$OBS_WS_PASSWORD}" >/dev/null 2>&1 || true
+sunshine >/var/log/sunshine.log 2>&1 &
 
 # Give Xvfb a moment before OBS attaches to it.
 sleep 2
