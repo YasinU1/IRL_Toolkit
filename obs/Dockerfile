@@ -71,10 +71,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgl1 libegl1 libgl1-mesa-dri libglx-mesa0 \
         librist4 libsrt1.5-openssl libv4l-0 \
         libva2 libva-drm2 libva-x11-2 libxcb-xinput0 \
-        # headless display + remote access
-        xvfb x11vnc novnc websockify pulseaudio \
-        fonts-dejavu-core ca-certificates gettext-base curl \
+        # audio + misc
+        pulseaudio fonts-dejavu-core ca-certificates gettext-base curl \
     && rm -rf /var/lib/apt/lists/*
+
+# KasmVNC: replaces Xvfb+x11vnc+noVNC — it IS the X server, with server-side
+# WebP/JPEG encoding and a modern web client. Far better browser quality.
+ARG KASMVNC_VERSION=1.4.0
+RUN curl -fsSL -o /tmp/kasmvnc.deb \
+        https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/kasmvncserver_noble_${KASMVNC_VERSION}_arm64.deb \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/kasmvnc.deb \
+    && rm /tmp/kasmvnc.deb && rm -rf /var/lib/apt/lists/*
 
 # Sunshine: Moonlight-protocol desktop streaming (high-quality remote OBS;
 # noVNC stays as the zero-dependency fallback).
